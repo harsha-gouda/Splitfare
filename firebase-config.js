@@ -14,4 +14,11 @@
 //   appId: "1:1234567890:web:abc123"
 // };
 
-window.SPLITFARE_FIREBASE = null;
+window.SPLITFARE_FIREBASE = {
+  apiKey: "AIzaSyDx4Uf3I9spp7nmfGoYZSlm944GwgEt7Tc",
+  authDomain: "splitfare-aebc5.firebaseapp.com",
+  projectId: "splitfare-aebc5",
+  storageBucket: "splitfare-aebc5.firebasestorage.app",
+  messagingSenderId: "662930221344",
+  appId: "1:662930221344:web:3dccd5fbeb89085eaa4f45"
+};
