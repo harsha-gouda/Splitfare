@@ -61,7 +61,7 @@ input:focus-visible, select:focus-visible, button:focus-visible, textarea:focus-
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
 
-.btn { font: 600 14px/1 var(--f-body); border-radius: 9px; padding: 11px 16px; border: 1px solid var(--line);
+.btn { text-decoration: none; font: 600 14px/1 var(--f-body); border-radius: 9px; padding: 11px 16px; border: 1px solid var(--line);
   background: var(--surface); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
 .btn:hover { background: var(--surface-2); }
 .btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
@@ -335,6 +335,7 @@ async function createTrip(ev) {
   try {
     let code; for (let i = 0; i < 5; i++) { code = newCode(); if (!(await db.doc("trips/" + code).get()).exists) break; }
     await db.doc("trips/" + code).set({ name, currency: cur, members: names.map(n => ({ id: rid("m"), name: n })), createdAt: new Date().toISOString() });
+    S.justCreated = code;
     location.hash = "trip-" + code;
   } catch (e) { err.textContent = ""; writeErr(e); }
 }
@@ -350,6 +351,7 @@ function openTrip(code) {
   S.unsub.push(db.doc("trips/" + code).onSnapshot(s => {
     if (!s.metadata.fromCache) S.loaded.trip = true;
     S.trip = s.exists ? s.data() : null; S.missing = !s.exists && !s.metadata.fromCache;
+    if (S.trip && S.justCreated === code) { S.justCreated = null; setTimeout(() => openShare(true), 0); }
     if (S.trip) rememberTrip(code, S.trip.name);
     done(); render();
   }, () => { S.loaded.trip = true; S.stale = true; render(); }));
@@ -398,8 +400,8 @@ function render() {
         <span class="label">Trip code</span>
         <span class="code">${esc(S.code)}</span>
         <div class="btns">
+          <button class="btn small" data-action="share">Share trip</button>
           <button class="btn small" data-action="copyCode">Copy code</button>
-          ${ARTIFACT_URL ? `<button class="btn small" data-action="copyLink">Copy invite link</button>` : ""}
         </div>
       </div>
     </section>
@@ -499,6 +501,9 @@ document.addEventListener("click", e => {
   else if (a === "tab") { S.tab = b.dataset.tab; lsSet("sf.tab", S.tab); render(); }
   else if (a === "copyCode") copy(S.code, "Trip code copied");
   else if (a === "copyLink") copy(inviteLink(S.code), "Invite link copied");
+  else if (a === "copyInvite") copy(inviteText(), "Invite copied. Paste it in your group chat.");
+  else if (a === "share") openShare(false);
+  else if (a === "nativeShare") nativeShare();
   else if (a === "copySummary") copy(summaryText(), "Summary copied");
   else if (a === "addExp") openExpense(null);
   else if (a === "editExp") { const ex = S.exps.find(x => x.id === b.dataset.id); if (ex) ex.kind === "payment" ? openPayment(ex) : openExpense(ex); }
@@ -519,6 +524,37 @@ function summaryText() {
 
 // ---------- sheets ----------
 function closeSheet() { $("#sheetHost").innerHTML = ""; }
+
+// ---------- sharing ----------
+function inviteText() {
+  const url = inviteLink(S.code);
+  return `Join "${S.trip?.name || "our trip"}" on Splitfare so we can split costs.\nTrip code: ${S.code}${url ? "\n" + url : ""}`;
+}
+async function nativeShare() {
+  const url = inviteLink(S.code);
+  try { await navigator.share({ title: "Splitfare: " + (S.trip?.name || "Trip"), text: inviteText().replace(url, "").trim(), ...(url ? { url } : {}) }); }
+  catch (e) { if (e?.name !== "AbortError") copy(inviteText(), "Invite copied. Paste it in your group chat."); }
+}
+function openShare(fresh) {
+  if (!S.trip) return;
+  const url = inviteLink(S.code), text = inviteText();
+  sheet(`<div class="sheet" role="dialog" aria-labelledby="shareTitle">
+    <div class="sheet-head"><h2 id="shareTitle">${fresh ? "Your trip is ready" : "Invite friends"}</h2><button type="button" class="x" data-action="closeSheet" aria-label="Close">×</button></div>
+    <p class="muted">${fresh ? "Send this to everyone going so they can add what they pay." : "Anyone with the code or link can open and add to this trip."}</p>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px;border:2px dashed var(--line);border-radius:12px">
+      <span class="label">Trip code</span><span class="code" style="color:var(--brand)">${esc(S.code)}</span>
+    </div>
+    ${url ? `<label class="field">Invite link<input id="shareLink" readonly value="${esc(url)}"></label>` : ""}
+    <div class="btns">
+      ${navigator.share ? `<button type="button" class="btn primary" data-action="nativeShare">Share…</button>` : ""}
+      <a class="btn ${navigator.share ? "" : "primary"}" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="btn" href="sms:?&body=${encodeURIComponent(text)}">Text message</a>
+      <button type="button" class="btn" data-action="copyInvite">Copy invite</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end"><button type="button" class="btn" data-action="closeSheet">Done</button></div>
+  </div>`);
+  const l = $("#shareLink"); if (l) l.addEventListener("focus", () => l.select());
+}
 function sheet(html) {
   $("#sheetHost").innerHTML = `<div class="backdrop" data-backdrop>${html}</div>`;
   $("#sheetHost .backdrop").addEventListener("mousedown", e => { if (e.target.hasAttribute("data-backdrop")) closeSheet(); });
