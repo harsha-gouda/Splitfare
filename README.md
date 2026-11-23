@@ -4,6 +4,8 @@ Split trip costs with friends. Start a trip, share its six-character code (or in
 
 It's a single static page (`index.html`), so it runs on GitHub Pages or any web host. Trips are stored in a free Firebase Firestore database, and everyone sees changes live.
 
+Go to app at : https://harsha-gouda.github.io/Splitfare/
+
 ## Features
 
 - Create a trip with a name, currency and the people going. You get a code like `K7MQ2P`.
