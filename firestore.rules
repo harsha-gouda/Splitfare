@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Splitfare access rules.
+// Anyone who knows a trip's code can open and edit that trip.
+// Nobody can list all trips, so codes can't be browsed or guessed from a list.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function validTrip(d) {
+      return d.name is string && d.name.size() > 0 && d.name.size() <= 60
+        && d.currency is string && d.currency.size() == 3
+        && d.members is list && d.members.size() >= 1 && d.members.size() <= 60;
+    }
+
+    function validEntry(d) {
+      return d.kind in ['expense', 'payment']
+        && d.amount is number && d.amount > 0 && d.amount < 100000000000
+        && d.paidBy is string
+        && d.shares is map && d.shares.size() >= 1 && d.shares.size() <= 60
+        && (!('title' in d) || (d.title is string && d.title.size() <= 80));
+    }
+
+    match /trips/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if code.matches('^[A-Z0-9]{6}$') && validTrip(request.resource.data);
+      allow update: if validTrip(request.resource.data);
+      allow delete: if false;
+
+      match /expenses/{entryId} {
+        function tripExists() {
+          return exists(/databases/$(database)/documents/trips/$(code));
+        }
+        allow read: if tripExists();
+        allow create, update: if tripExists() && validEntry(request.resource.data);
+        allow delete: if tripExists();
+      }
+    }
+  }
+}
